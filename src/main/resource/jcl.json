@@ -1,0 +1,28 @@
+{
+  "registerUrl" : {
+      "ip": "169.169.41.35",
+      "port": 9000,
+      "url": "/register"
+  },
+  "loginServer": "yplan_service_prd",
+  "provider":{
+    "serverId":"ITAF",
+    "serverName": "ITAF",
+    "port": 8181,
+    "weight":1,
+    "version": "1.0",
+    "type": "http",
+    "desc": "IT工作联系单(IT Application Form)"
+  },
+  "db":{
+    "provider_class": "io.vertx.ext.jdbc.spi.impl.HikariCPDataSourceProvider",
+    "jdbcUrl": "jdbc:oracle:thin:@169.169.41.25:1521:appdb",
+    "driverClassName": "oracle.jdbc.driver.OracleDriver",
+    "username": "jcl",
+    "password": "jcl",
+    "maximumPoolSize": 10
+  },
+  "upload":{
+      "upload_dir": "c:/jcl_upload/contact/"
+  }
+}
