@@ -9,6 +9,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.jdbc.JDBCClient;
 import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 
 /**
  * @author PJ
@@ -28,7 +29,7 @@ public class JclConfig {
 	 * 注册服务URL
 	 */
 	public static JsonObject registerUrl;
-	
+
 	/**
 	 * 上传目录
 	 */
@@ -43,11 +44,13 @@ public class JclConfig {
 	 * 数据库链接
 	 */
 	private JDBCClient dbClient;
+	
+	private WebClient wc;
 
 	static {
 		byte[] buff = new byte[102400];
 		try {
-			new FileInputStream(new File("./jcl.json")).read(buff);
+			new FileInputStream(new File("jcl.json")).read(buff);
 			config = new JsonObject(new String(buff, "utf-8"));
 			registerUrl = config.getJsonObject("registerUrl");
 			loginServer = config.getString("loginServer");
@@ -66,13 +69,14 @@ public class JclConfig {
 			throw new RuntimeException("没有找到指定的数据源");
 		}
 		dbClient = JDBCClient.createShared(vertx, dbConfig);
+		wc = WebClient.create(vertx,
+				new WebClientOptions().setIdleTimeout(2).setConnectTimeout(2000).setMaxWaitQueueSize(5));
 		// 定时注册服务
 		vertx.setPeriodic(5000, timerId -> {
 			try {
 				provider.put("ip", InetAddress.getLocalHost().getHostAddress());
-				WebClient hc = WebClient.create(vertx);
-				hc.post(registerUrl.getInteger("port"), registerUrl.getString("ip"), registerUrl.getString("url"))
-						.sendJsonObject(provider, ar -> {
+				wc.post(registerUrl.getInteger("port"), registerUrl.getString("ip"), registerUrl.getString("url"))
+						.timeout(1000).sendJsonObject(provider, ar -> {
 					if (!ar.succeeded()) {
 						ar.cause().printStackTrace();
 					}

@@ -133,10 +133,12 @@ public class NotifyHandler {
 					.add(pp.getString("publishType"))// MSGTYPE
 					.add(pp.getInteger("publishRange"))// MSGRANGE
 					.add(pp.getString("publishUser"))// PUBLISHUSER
-					.add(Utils.getUTCTimeStr());// PUBLISHDATE
+					.add(Utils.getUTCTimeStr())// PUBLISHDATE
+					.add(pp.getString("expirationTime"))//EXPIRATIONTIME
+					.add(pp.getString("valid"));//VALID
 			String sql = "insert into contact_broadcast(MSGID,CONTACTID,TITLE," //
-					+ "CONTENT,MSGLEVEL,MSGTYPE,MSGRANGE,PUBLISHUSER,PUBLISHDATE) values("//
-					+ "?,?,?,?,?,?,?,?,?)";
+					+ "CONTENT,MSGLEVEL,MSGTYPE,MSGRANGE,PUBLISHUSER,PUBLISHDATE,EXPIRATIONTIME,VALID) values("//
+					+ "?,?,?,?,?,?,?,?,?,?,?)";
 			client.updateWithParams(sql, pm, ar -> {
 				if (ar.succeeded()) {
 					rr.put("flag", true);
@@ -168,13 +170,15 @@ public class NotifyHandler {
 			if ("ALL".equals(range)) {
 				subSql = " msgrange in (1,2,4) ";
 			} else if ("PRD".equals(range)) {
-				subSql = " msgrange = 2 ";
+				subSql = " msgrange in (2,4) ";
 			} else if ("OFFICE".equals(range)) {
-				subSql = " msgrange = 1 ";
-			}
+				subSql = " msgrange in (1,4) ";
+			}	
+			subSql += " and (expirationtime >= " + Utils.getDBTimeStr() + " or expirationtime is null) " ;
+			subSql += " and valid = 'Y'";
 			JsonArray pm = new JsonArray().add(pp.getInteger("rownum"));
 			String sql = "select * from (select * from contact_broadcast where " + subSql
-					+ "order by publishdate desc) a where rownum <= ?";
+					+ " order by publishdate desc) a where rownum <= ?";
 			client.queryWithParams(sql, pm, ar -> {
 				if (ar.succeeded()) {
 					rr.put("flag", true);

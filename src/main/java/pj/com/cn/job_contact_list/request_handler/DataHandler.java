@@ -17,8 +17,8 @@ import pj.com.cn.job_contact_list.JdbcHelper;
  */
 public class DataHandler {
 
-	private  final JdbcHelper helper;
-	
+	private final JdbcHelper helper;
+
 	private NotifyHandler notifyHandler;
 
 	public NotifyHandler getNotifyHandler() {
@@ -74,9 +74,9 @@ public class DataHandler {
 			}
 			// 查询
 			sql += " order by checkindate desc";
-			sql = "select a.*,b.containerList from ("+ sql +") a,"//        
-              + " (SELECT contactid,LISTAGG(cntrid, ',') WITHIN GROUP(ORDER BY contactid) AS containerList "//
-              + " from contact_cntrs group by contactid) b where a.contactid = b.contactid(+) ";
+			sql = "select a.*,b.containerList from (" + sql + ") a,"//
+					+ " (SELECT contactid,LISTAGG(cntrid, ',') WITHIN GROUP(ORDER BY contactid) AS containerList "//
+					+ " from contact_cntrs group by contactid) b where a.contactid = b.contactid(+) ";
 			helper.getRows(sql, null, arr -> {
 				result.put("flag", true);
 				result.put("data", arr);
@@ -112,7 +112,8 @@ public class DataHandler {
 			} else {
 				subSql = " nvl(infin,' ') <> ' ' ";
 			}
-			String sql = "select * from contact where " + subSql + " order by checkindate desc";
+			String sql = "select * from contact where " + subSql
+					+ " and contacttype = 'DATA' and nvl(indt,' ') <> 'Y' order by checkindate desc";
 			helper.getRows(sql, null, arr -> {
 				result.put("flag", true);
 				result.put("data", arr);

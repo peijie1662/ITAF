@@ -21,6 +21,7 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.WebClient;
 import pj.com.cn.job_contact_list.JclConfig;
 import pj.com.cn.job_contact_list.JdbcHelper;
+import pj.com.cn.job_contact_list.Utils;
 
 /**
  * @author PJ
@@ -211,6 +212,7 @@ public class CommonHandler {
 			cf.compose(r -> {
 				// 2.1 保存联系单信息
 				JsonArray pm = new JsonArray();
+				pm.add(pp.getString("contactType"));
 				pm.add(pp.getString("content"));
 				pm.add(pp.getString("finLink"));
 				pm.add(pp.getInteger("contactId"));
@@ -218,12 +220,14 @@ public class CommonHandler {
 				if (!"CHECKIN".equals(r.getString(0))) {
 					uf.fail("不是登记状态不能修改联系单内容。");
 				} else {
-					String sql = "update contact set content = ?,finlink = ? where contactid = ?";
+					String sql = "update contact set contactType = ?,content = ?,finlink = ? where contactid = ?";
 					client.updateWithParams(sql, pm, uf);
 				}
 				return uf;
 			}).compose(r -> {
 				Future<UpdateResult> lf = Future.future();// 日志
+				String originContactType = pp.getString("originContactType");
+				String contactType = pp.getString("contactType");
 				String originFinLink = pp.getString("originFinLink");
 				String finLink = pp.getString("finLink");
 				String originContent = pp.getString("originContent");
@@ -236,6 +240,11 @@ public class CommonHandler {
 				}
 				if (!originContent.equals(content)) {
 					statusDesc += "用户" + pp.getString("operator") + "修改了工作联系单内容。";
+					chg = true;
+				}
+				if (!originContactType.equals(contactType)) {
+					statusDesc += "用户" + pp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
+							+ contactType + "。";
 					chg = true;
 				}
 				if (chg) {
@@ -273,22 +282,61 @@ public class CommonHandler {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		try {
-			JsonObject params = ctx.getBodyAsJson();
+			JsonObject pp = ctx.getBodyAsJson();
+			String originIter = pp.getString("originIter");
+			String iter = pp.getString("iter");
+			String originContactType = pp.getString("originContactType");
+			String contactType = pp.getString("contactType");
+			// 1.修改
 			JsonArray pm = new JsonArray();
-			pm.add(params.getString("iter"));
-			pm.add(params.getString("itMark"));
-			pm.add(params.getInteger("contactId"));
-			client.updateWithParams("update contact set iter = ?,itMark = ? where contactId = ?", pm, ar -> {
-				if (ar.succeeded()) {
+			pm.add(pp.getString("contactType"));
+			pm.add(pp.getString("iter"));
+			pm.add(pp.getString("itMark"));
+			pm.add(pp.getInteger("contactId"));
+			Future<UpdateResult> uf = Future.future();
+			client.updateWithParams("update contact set contactType = ?,iter = ?,itMark = ? where contactId = ?", pm,
+					uf);
+			uf.compose(r -> {
+				String statusDesc = "";
+				if (!Utils.strEquals(originIter, iter)) {
+					statusDesc += "用户" + pp.getString("operator") + "修改了IT处理人员，从" + originIter + "改为" + iter + "。";
+				}
+				if (!Utils.strEquals(originContactType, contactType)) {
+					statusDesc += "用户" + pp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
+							+ contactType + "。";
+				}			
+				Future<UpdateResult> lf = Future.future();
+				if ("".equals(statusDesc)) {
+					lf.complete(); //如果只是修改IT备注或未修改，那么不记录备注。 
+					return lf;
+				} else {
+					// 2.日志
+					JsonArray lm = new JsonArray();
+					lm.add(UUID.randomUUID().toString());
+					lm.add(pp.getInteger("contactId"));
+					lm.add("MODIFY");
+					lm.add(statusDesc);
+					lm.add(pp.getString("operator"));
+					lm.add(pp.getString("operationDate"));
+					client.updateWithParams("insert into contact_log(logId,contactId,status,statusdesc," //
+							+ "operator,operationdate) "//
+							+ "values(?,?,?,?,?,?)", lm, lf);
+					return lf;
+				}
+			}).setHandler(r -> {
+				if (r.succeeded()) {
 					rr.put("flag", true);
 				} else {
+					r.cause().printStackTrace();
 					rr.put("flag", false);
-					rr.put("errMsg", ar.cause().getMessage());
+					rr.put("errMsg", r.cause().getMessage());
 				}
 				res.end(rr.encodePrettily());
 			});
 		} catch (Exception e) {
-			e.printStackTrace();
+			rr.put("flag", false);
+			rr.put("errMsg", e.getMessage());
+			res.end(rr.encodePrettily());
 		}
 	}
 
@@ -470,6 +518,34 @@ public class CommonHandler {
 			});
 		} catch (Exception e) {
 			e.printStackTrace();
+			rr.put("flag", false);
+			rr.put("errMsg", e.getMessage());
+			res.end(rr.encodePrettily());
+		}
+	}
+
+	/**
+	 * 工作联系单状态改变
+	 */
+	public void handleTypeChg(RoutingContext ctx) {
+		HttpServerResponse res = ctx.response();
+		res.putHeader("content-type", "application/json");
+		JsonObject rr = new JsonObject();
+		try {
+			JsonObject pp = ctx.getBodyAsJson();
+			JsonArray pm = new JsonArray();
+			pm.add(pp.getString("contactType"));
+			pm.add(pp.getInteger("contactId"));
+			client.updateWithParams("update contact set contactType = ? where contactId = ? ", pm, r -> {
+				if (r.succeeded()) {
+					rr.put("flag", true);
+				} else {
+					rr.put("flag", false);
+					rr.put("errMsg", r.cause().getMessage());
+				}
+				res.end(rr.encodePrettily());
+			});
+		} catch (Exception e) {
 			rr.put("flag", false);
 			rr.put("errMsg", e.getMessage());
 			res.end(rr.encodePrettily());

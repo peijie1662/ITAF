@@ -15,5 +15,20 @@ public final class Utils {
 		df.setTimeZone(TimeZone.getTimeZone("UTC"));
 		return df.format(new Date());
 	}
+	
+	public static String getDBTimeStr() {
+		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		String ds = "to_date('"+ df.format(new Date()) +"','yyyy-mm-dd hh24:mi:ss')";
+		return ds;
+	}	
+	
+	public static boolean strEquals(String str1,String str2){
+		if (str1 == null && str2 == null){
+			return true;
+		}else if(str1 != null){
+			return str1.equals(str2);
+		}
+		return false;
+	}
 
 }
