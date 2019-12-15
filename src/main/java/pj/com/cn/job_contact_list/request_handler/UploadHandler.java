@@ -13,7 +13,8 @@ import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.FileUpload;
 import io.vertx.ext.web.RoutingContext;
-import pj.com.cn.job_contact_list.JclConfig;
+import pj.com.cn.job_contact_list.ConfigVerticle;
+import pj.com.cn.job_contact_list.model.CallResult;
 
 /**
  * @author PJ
@@ -21,7 +22,7 @@ import pj.com.cn.job_contact_list.JclConfig;
  */
 public class UploadHandler {
 
-	private final static String CONTACT_UPLOAD_URL = JclConfig.uploadDir;
+	private final static String CONTACT_UPLOAD_URL = ConfigVerticle.uploadDir;
 
 	private final Vertx vertx;
 
@@ -36,7 +37,7 @@ public class UploadHandler {
 	public void contactFileList(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		JsonObject rr = new JsonObject();
+		CallResult<List<String>> result = new CallResult<List<String>>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			JsonObject pp = ctx.getBodyAsJson();
@@ -48,14 +49,12 @@ public class UploadHandler {
 				fNames = fs.readDirBlocking(dir).stream().map(f -> f.substring(f.lastIndexOf("\\") + 1))
 						.collect(Collectors.toList());
 			}
-			rr.put("flag", true);
-			rr.put("data", fNames);
+			result.ok(fNames);
 		} catch (Exception e) {
 			e.printStackTrace();
-			rr.put("flag", false);
-			rr.put("err_msg", e.getMessage());
+			result.err(e.getMessage());
 		}
-		res.end(rr.encodePrettily());
+		res.end(result.toString());
 	}
 
 	/**
@@ -66,7 +65,7 @@ public class UploadHandler {
 	public void uploadContact(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		JsonObject rr = new JsonObject();
+		CallResult<String> result = new CallResult<String>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			String userId = ctx.request().getFormAttribute("userId");
@@ -77,22 +76,20 @@ public class UploadHandler {
 				fs.mkdirsBlocking(userPath);
 			}
 			Set<FileUpload> uploads = ctx.fileUploads();
-			rr.put("flag", true);
+			result.ok();
 			uploads.forEach(fileUpload -> {
 				String path = userPath + "/" + fileUpload.fileName();
 				fs.move(fileUpload.uploadedFileName(), path, new CopyOptions().setReplaceExisting(true), ar -> {
 					if (!ar.succeeded()) {
-						rr.put("flag", false);
-						rr.put("errMsg", ar.cause().getMessage());
+						result.err(ar.cause().getMessage());
 					}
 				});
 			});
-			res.end(rr.encodePrettily());
+			res.end(result.toString());
 		} catch (Exception e) {
 			e.printStackTrace();
-			rr.put("flag", false);
-			rr.put("err_msg", e.getMessage());
-			res.end(rr.encodePrettily());
+			result.err(e.getMessage());
+			res.end(result.toString());
 		}
 	}
 
@@ -101,20 +98,22 @@ public class UploadHandler {
 	 * 通过指定文件列表和contactId,将文件列表从用户文件夹归档到联系单文件夹
 	 */
 	public void fileTheDocument(String userId, int contactId, String fileList) {
-		FileSystem fs = vertx.fileSystem();
-		String userPath = CONTACT_UPLOAD_URL + userId;
-		String contactPath = CONTACT_UPLOAD_URL + userId + "/" + contactId;
-		if (!fs.existsBlocking(contactPath)) {
-			fs.mkdirsBlocking(contactPath);
-		}
-		List<String> fNames = Arrays.asList(fileList.split(","));
-		fNames.forEach(f -> {
-			String ori_url = userPath + "/" + f;
-			String tar_url = contactPath + "/" + f;
-			if (fs.existsBlocking(ori_url)) {
-				fs.moveBlocking(ori_url, tar_url);
+		if (!fileList.isEmpty()) {
+			FileSystem fs = vertx.fileSystem();
+			String userPath = CONTACT_UPLOAD_URL + userId;
+			String contactPath = CONTACT_UPLOAD_URL + userId + "/" + contactId;
+			if (!fs.existsBlocking(contactPath)) {
+				fs.mkdirsBlocking(contactPath);
 			}
-		});
+			List<String> fNames = Arrays.asList(fileList.split(","));
+			fNames.forEach(f -> {
+				String ori_url = userPath + "/" + f;
+				String tar_url = contactPath + "/" + f;
+				if (fs.existsBlocking(ori_url)) {
+					fs.moveBlocking(ori_url, tar_url);
+				}
+			});
+		}
 	}
 
 	/**
@@ -156,7 +155,7 @@ public class UploadHandler {
 	public void delContactFile(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		JsonObject rr = new JsonObject();
+		CallResult<String> result = new CallResult<String>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			JsonObject pp = ctx.getBodyAsJson();
@@ -167,12 +166,11 @@ public class UploadHandler {
 					: CONTACT_UPLOAD_URL + userId + "/" + contactId;
 			filePath += "/" + fileName;
 			fs.deleteBlocking(filePath);
-			rr.put("flag", true);
+			result.ok();
 		} catch (Exception e) {
 			e.printStackTrace();
-			rr.put("flag", false);
-			rr.put("err_msg", e.getMessage());
+			result.err(e.getMessage());
 		}
-		res.end(rr.encodePrettily());
+		res.end(result.toString());
 	}
 }

@@ -3,7 +3,6 @@ package pj.com.cn.job_contact_list;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpMethod;
-import io.vertx.ext.jdbc.JDBCClient;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CorsHandler;
@@ -20,98 +19,92 @@ import pj.com.cn.job_contact_list.request_handler.UploadHandler;
  */
 public class MainVerticle extends AbstractVerticle {
 
-	private JclConfig config;
-
-	private JDBCClient dbClient;
-
-	private JdbcHelper helper;
-
 	@Override
 	public void start(Future<Void> startFuture) throws Exception {
-		config = new JclConfig(vertx);
-		dbClient = config.getDbClient();
-		helper = new JdbcHelper(this.dbClient);
 		Router router = Router.router(vertx);
-		router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET).allowedMethod(HttpMethod.OPTIONS)
-				.allowedMethod(HttpMethod.POST).allowedHeader("X-PINGARUNER").allowedHeader("Content-Type"));
+		router.route().handler(CorsHandler.create("*")//
+				.allowedMethod(HttpMethod.GET)//
+				.allowedMethod(HttpMethod.OPTIONS)//
+				.allowedMethod(HttpMethod.POST)//
+				.allowedHeader("X-PINGARUNER")//
+				.allowedHeader("Content-Type"));
 		router.route().handler(BodyHandler.create());
-
 		// 消息通知
-		NotifyHandler notifyHandler = new NotifyHandler(dbClient);
+		NotifyHandler notifyHandler = new NotifyHandler();
 		// 文件上传
 		router.route().handler(BodyHandler.create());
 		UploadHandler uploadHandler = new UploadHandler(vertx);
 		// 通用联系单处理
-		CommonHandler commonHandler = new CommonHandler(vertx, dbClient, helper);
+		CommonHandler commonHandler = new CommonHandler();
 		commonHandler.setNotifyHandler(notifyHandler);
 		commonHandler.setUploadHandler(uploadHandler);
 		// 数据联系单处理
-		DataHandler dataHandler = new DataHandler(helper);
+		DataHandler dataHandler = new DataHandler();
 		dataHandler.setNotifyHandler(notifyHandler);
 		// 开发联系单处理
-		DevHandler devHandler = new DevHandler(dbClient);
+		DevHandler devHandler = new DevHandler();
 		devHandler.setNotifyHandler(notifyHandler);
 		// 改进项目处理
-		ImproveHandler improveHandler = new ImproveHandler(dbClient);
+		ImproveHandler improveHandler = new ImproveHandler();
 		improveHandler.setNotifyHandler(notifyHandler);
 		// 登录
-		router.post("/login").blockingHandler(commonHandler::handleLogin);
+		router.post("/login").blockingHandler(commonHandler::handleLogin,false);
 		// 单个联系单
-		router.post("/single").blockingHandler(commonHandler::singleContact);
+		router.post("/single").blockingHandler(commonHandler::singleContact,false);
 		// 修改工作联系单列表
-		router.post("/list/data").blockingHandler(dataHandler::handleDataContacts);
+		router.post("/list/data").blockingHandler(dataHandler::handleDataContacts,false);
 		// 开发工作联系单列表
-		router.post("/list/dev").blockingHandler(devHandler::handleDevContacts);
+		router.post("/list/dev").blockingHandler(devHandler::handleDevContacts,false);
 		// 改进项目列表
-		router.post("/list/improve").blockingHandler(improveHandler::handleImproveContacts);
+		router.post("/list/improve").blockingHandler(improveHandler::handleImproveContacts,false);
 		// 财务审核列表
-		router.post("/list/fincheck").blockingHandler(dataHandler::handleFinCheckContacts);
+		router.post("/list/fincheck").blockingHandler(dataHandler::handleFinCheckContacts,false);
 		// 财务相关列表
-		router.post("/list/finlink").blockingHandler(devHandler::handleFinLinkContacts);
+		router.post("/list/finlink").blockingHandler(devHandler::handleFinLinkContacts,false);
 		// 回收站列表
-		router.post("/list/recycle").blockingHandler(commonHandler::handleRecycle);
+		router.post("/list/recycle").blockingHandler(commonHandler::handleRecycle,false);
 		// 用户消息列表
-		router.post("/list/notify").blockingHandler(notifyHandler::handleNotify);
+		router.post("/list/notify").blockingHandler(notifyHandler::handleNotify,false);
 		// 联系单修改类别
-		router.post("/contact/typechg").blockingHandler(commonHandler::handleTypeChg);
+		router.post("/contact/typechg").blockingHandler(commonHandler::handleTypeChg,false);
 		// 联系单保存修改(CHECKIN/MODIFY)
-		router.post("/contact/save").blockingHandler(commonHandler::handleSave);
+		router.post("/contact/save").blockingHandler(commonHandler::handleSave,false);
 		// 联系单处理人员及IT备注
-		router.post("/contact/iterandmark").blockingHandler(commonHandler::handleIterAndMark);
+		router.post("/contact/iterandmark").blockingHandler(commonHandler::handleIterAndMark,false);
 		// 联系单删除
-		router.post("/contact/del").blockingHandler(commonHandler::handleDel);
+		router.post("/contact/del").blockingHandler(commonHandler::handleDel,false);
 		// 联系单受理(ACCEPTED)
-		router.post("/contact/accept").blockingHandler(commonHandler::handleAccept);
+		router.post("/contact/accept").blockingHandler(commonHandler::handleAccept,false);
 		// 联系单回退
-		router.post("/contact/goback").blockingHandler(commonHandler::handleGoback);
+		router.post("/contact/goback").blockingHandler(commonHandler::handleGoback,false);
 		// 联系单通用(SUSPEND/CANCEL)
-		router.post("/contact/common").blockingHandler(commonHandler::handleCommon);
+		router.post("/contact/common").blockingHandler(commonHandler::handleCommon,false);
 		// 联系单时间线查询
-		router.post("/contact/timeline").blockingHandler(commonHandler::handleTimeline);
+		router.post("/contact/timeline").blockingHandler(commonHandler::handleTimeline,false);
 		// 财务审核
-		router.post("/contact/fincheck").blockingHandler(dataHandler::handleFinCheck);
+		router.post("/contact/fincheck").blockingHandler(dataHandler::handleFinCheck,false);
 		// 财务相关
-		router.post("/contact/finlink").blockingHandler(devHandler::handleFinLink);
+		router.post("/contact/finlink").blockingHandler(devHandler::handleFinLink,false);
 		// 联系单附件上传
-		router.post("/contact/upload").blockingHandler(uploadHandler::uploadContact);
+		router.post("/contact/upload").blockingHandler(uploadHandler::uploadContact,false);
 		// 联系单附件下载
-		router.post("/contact/download").blockingHandler(uploadHandler::downloadContact);
+		router.post("/contact/download").blockingHandler(uploadHandler::downloadContact,false);
 		// 联系单附件删除
-		router.post("/contact/delfile").blockingHandler(uploadHandler::delContactFile);
+		router.post("/contact/delfile").blockingHandler(uploadHandler::delContactFile,false);
 		// 联系单附件列表
-		router.post("/contact/listfile").blockingHandler(uploadHandler::contactFileList);
+		router.post("/contact/listfile").blockingHandler(uploadHandler::contactFileList,false);
 		// 单个服务
-		router.post("/readmsg").blockingHandler(notifyHandler::readMsg);
+		router.post("/readmsg").blockingHandler(notifyHandler::readMsg,false);
 		// 首页-上线列表
-		router.post("/list/online").blockingHandler(devHandler::onlineList);
+		router.post("/list/online").blockingHandler(devHandler::onlineList,false);
 		// 首页-联系单动态
-		router.post("/list/contactlog").blockingHandler(commonHandler::contactLogList);
+		router.post("/list/contactlog").blockingHandler(commonHandler::contactLogList,false);
 		// 公告-保存
-		router.post("/broadcast/save").blockingHandler(notifyHandler::saveBroadcast);
+		router.post("/broadcast/save").blockingHandler(notifyHandler::saveBroadcast,false);
 		// 公告-列表
-		router.post("/broadcast/list").blockingHandler(notifyHandler::broadcastList);
+		router.post("/broadcast/list").blockingHandler(notifyHandler::broadcastList,false);
 		// 启动服务
-		vertx.createHttpServer().requestHandler(router).listen(config.getItafPort());
+		vertx.createHttpServer().requestHandler(router).listen(ConfigVerticle.getItafPort());
 	}
 
 }

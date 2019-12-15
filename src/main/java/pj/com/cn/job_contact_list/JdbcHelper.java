@@ -3,12 +3,14 @@ package pj.com.cn.job_contact_list;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import java.util.function.Consumer;
 
+import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.jdbc.JDBCClient;
-import io.vertx.ext.sql.ResultSet;
+import io.vertx.ext.sql.SQLClient;
+import io.vertx.ext.sql.SQLConnection;
+import io.vertx.ext.web.RoutingContext;
+import pj.com.cn.job_contact_list.model.CallResult;
 
 /**
  * @author PJ
@@ -16,148 +18,97 @@ import io.vertx.ext.sql.ResultSet;
  */
 public class JdbcHelper {
 
-	private JDBCClient client;
-
-	public JdbcHelper(JDBCClient client) {
-		this.client = client;
+	/**
+	 * 查询数据集
+	 * 
+	 * @param ctx
+	 * @param sql
+	 */
+	public static void rows(RoutingContext ctx, String sql) {
+		JdbcHelper.rows(ctx, sql, null);
 	}
 
 	/**
-	 * 记录集
+	 * 查询数据集
 	 * 
+	 * @param ctx
 	 * @param sql
-	 * @param args
-	 * @param fun
+	 * @param params
 	 */
-	public void getRows(String sql, JsonArray args, Consumer<JsonArray> successFun, Consumer<JsonObject> failFun) {
-		client.queryWithParams(sql, args, result -> {
-			if (result.succeeded()) {
-				ResultSet resultSet = result.result();
-				JsonArray arr = new JsonArray(resultSet.getRows());
-				successFun.accept(arr);
-			} else {
-				JsonObject fail = new JsonObject();
-				fail.put("errMsg", result.cause().getMessage());
-				failFun.accept(fail);
-			}
-		});
-	}
-
-	/**
-	 * 第一行数据 ，为空则异常 多用于单行数据获得
-	 * 
-	 * @param sql
-	 * @param args
-	 * @param fun
-	 */
-	public void getOneRow(String sql, JsonArray args, Consumer<JsonObject> successFun, Consumer<JsonObject> failFun) {
-		client.queryWithParams(sql, args, result -> {
-			if (result.succeeded()) {
-				JsonObject j = result.result().getRows().get(0);
-				successFun.accept(j);
-			} else {
-				JsonObject fail = new JsonObject();
-				fail.put("errMsg", result.cause().getMessage());
-				failFun.accept(fail);
-			}
-		});
-	}
-
-	/**
-	 * 判断SQL数据是否存在 ，不存在则异常
-	 * 
-	 * @param sql
-	 * @param args
-	 * @param fun
-	 */
-	public void isExpect(String sql, JsonArray args, Consumer<JsonObject> successFun, Consumer<JsonObject> failFun,
-			String errMsg) {
-		client.queryWithParams(sql, args, result -> {
-			if (result.succeeded()) {
-				if (result.result().getNumRows() > 0) {
-					JsonObject j = result.result().getRows().get(0);
-					successFun.accept(j);
+	public static void rows(RoutingContext ctx, String sql, JsonArray params) {
+		HttpServerResponse res = ctx.response();
+		res.putHeader("content-type", "application/json");
+		SQLClient client = ConfigVerticle.client;
+		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
+		try {
+			client.getConnection(cr -> {
+				if (cr.succeeded()) {
+					SQLConnection connection = cr.result();
+					if (connection != null) {
+						connection.queryWithParams(sql, params, qr -> {
+							if (qr.succeeded()) {
+								res.end(result.ok(qr.result().getRows()).toString());
+							} else {
+								res.end(result.err().toString());
+							}
+							connection.close();
+						});
+					} else {
+						res.end(result.err("the DB connect is null.").toString());
+					}
 				} else {
-					JsonObject fail = new JsonObject();
-					fail.put("errMsg", errMsg);
-					failFun.accept(fail);
+					res.end(result.err("get DB connect err.").toString());
 				}
-			} else {
-				JsonObject fail = new JsonObject();
-				fail.put("errMsg", result.cause().getMessage());
-				failFun.accept(fail);
-			}
-		});
+			});
+		} catch (Exception e) {
+			res.end(result.err(e.getMessage()).toString());
+		}
 	}
 
 	/**
-	 * 判断SQL数据是否不存在 ，存在则异常
+	 * 修改记录
 	 * 
+	 * @param ctx
 	 * @param sql
-	 * @param args
-	 * @param fun
+	 * @param params
+	 * @return
 	 */
-	public void notExpect(String sql, JsonArray args, Consumer<JsonObject> successFun, Consumer<JsonObject> failFun,
-			String errMsg) {
-		client.queryWithParams(sql, args, result -> {
-			if (result.succeeded()) {
-				if (result.result().getNumRows() == 0) {
-					successFun.accept(new JsonObject());
+	public static void update(RoutingContext ctx, String sql, JsonArray params) {
+		HttpServerResponse res = ctx.response();
+		res.putHeader("content-type", "application/json");
+		SQLClient client = ConfigVerticle.client;
+		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
+		try {
+			client.getConnection(cr -> {
+				if (cr.succeeded()) {
+					SQLConnection connection = cr.result();
+					if (connection != null) {
+						connection.updateWithParams(sql, params, qr -> {
+							if (qr.succeeded()) {
+								res.end(result.ok().toString());
+							} else {
+								res.end(result.err().toString());
+							}
+							connection.close();
+						});
+					} else {
+						res.end(result.err("the DB connect is null.").toString());
+					}
 				} else {
-					JsonObject fail = new JsonObject();
-					fail.put("errMsg", errMsg);
-					failFun.accept(fail);
+					res.end(result.err("get DB connect err.").toString());
 				}
-			} else {
-				JsonObject fail = new JsonObject();
-				fail.put("errMsg", result.cause().getMessage());
-				failFun.accept(fail);
-			}
-		});
-	}
-
-	/**
-	 * 执行
-	 * 
-	 * @param sql
-	 * @param args
-	 * @param fun
-	 */
-	public void exeSql(String sql, JsonArray args, Consumer<Integer> successFun, Consumer<JsonObject> failFun) {	
-		client.updateWithParams(sql, args, result -> {
-			if (result.succeeded()) {
-				int r = result.result().getUpdated();
-				successFun.accept(r);
-			} else {				
-				JsonObject fail = new JsonObject();
-				fail.put("errMsg", result.cause().getMessage());
-				failFun.accept(fail);
-			}
-		});
+			});
+		} catch (Exception e) {
+			res.end(result.err(e.getMessage()).toString());
+		}
 	}
 
 	/**
 	 * 转换日期字符串
 	 */
-	public String toDbDate(Date dt) {
+	public static String toDbDate(Date dt) {
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		String dtStr = "to_date('" + sdf.format(dt) + "','yyyy-mm-dd hh24:mi:ss')";
 		return dtStr;
 	}
-
-	/**
-	 * 批量执行SQL
-	 */
-	public List<Integer> batchSql(List<String> sqls) {
-		return null;
-	}
-
-	public JDBCClient getClient() {
-		return client;
-	}
-
-	public void setClient(JDBCClient client) {
-		this.client = client;
-	}
-
 }

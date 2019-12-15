@@ -20,7 +20,8 @@
     "driverClassName": "oracle.jdbc.driver.OracleDriver",
     "username": "jcl",
     "password": "jcl",
-    "maximumPoolSize": 10
+    "maximumPoolSize": 10,
+    "minimumIdle": 10
   },
   "upload":{
       "upload_dir": "c:/jcl_upload/contact/"
