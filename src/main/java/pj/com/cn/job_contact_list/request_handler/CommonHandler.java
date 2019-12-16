@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import com.alibaba.fastjson.JSONObject;
 
@@ -40,7 +41,7 @@ public class CommonHandler {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		JsonObject params = ctx.getBodyAsJson();
-		CallResult<String> result = new CallResult<String>();
+		CallResult<JSONObject> result = new CallResult<JSONObject>();
 		// 1.寻找登录服务
 		try {
 			WebClient webClient = WebClient.create(vertx);
@@ -61,7 +62,7 @@ public class CommonHandler {
 							if (h.succeeded()) {
 								JSONObject lr = h.result().bodyAsJson(JSONObject.class);
 								if (lr.getBoolean("flag")) {
-									result.ok(lr.getString("outMsg"));
+									result.ok(JSONObject.parseObject(lr.getString("outMsg")));
 									res.end(result.toString());
 								} else {
 									result.err("访问登录服务出错:" + lr.getString("errMsg"));
@@ -90,24 +91,27 @@ public class CommonHandler {
 	public void handleSave(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		JsonObject pp = ctx.getBodyAsJson();
+		JsonObject rp = ctx.getBodyAsJson();
 		CallResult<String> result = new CallResult<String>();
 		SQLClient client = ConfigVerticle.client;
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.1 添加-ID
-				Future<Integer> getIdFuture = Future.future(promise -> {
-					String sql = "select f_getSequ(?) as seq from dual";
-					JsonArray params = new JsonArray().add("LXDSEQ");
-					connection.queryWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete(r.result().getRows().get(0).getInteger("SEQ"));// newId
-						} else {
-							promise.fail("get contact id error.");
-						}
+				Supplier<Future<Integer>> getIdFuture = () -> {
+					Future<Integer> f = Future.future(promise -> {
+						String sql = "select f_getSequ(?) as seq from dual";
+						JsonArray params = new JsonArray().add("LXDSEQ");
+						connection.queryWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete(r.result().getRows().get(0).getInteger("SEQ"));// newId
+							} else {
+								promise.fail("get contact id error.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 1.2 添加-保存联系单信息
 				Function<Integer, Future<Integer>> sf = newId -> {
 					Future<Integer> f = Future.future(promise -> {
@@ -116,18 +120,18 @@ public class CommonHandler {
 								+ "checkindate,infin,finlink) values(?,?,?,?,?,?,?,?,?,?,?,?,?)";
 						JsonArray params = new JsonArray();
 						params.add(newId);
-						params.add(pp.getString("contactType"));// contactType
-						params.add(pp.getString("department"));// department
-						params.add(pp.getString("linkman"));// linkMan
-						params.add(pp.getString("phone"));// phone
-						params.add(pp.getString("linkSystem"));// linkSystem
-						params.add(pp.getString("contactLevel"));// contactLevel
-						params.add(pp.getString("content"));// content
+						params.add(rp.getString("contactType"));// contactType
+						params.add(rp.getString("department"));// department
+						params.add(rp.getString("linkman"));// linkMan
+						params.add(rp.getString("phone"));// phone
+						params.add(rp.getString("linkSystem"));// linkSystem
+						params.add(rp.getString("contactLevel"));// contactLevel
+						params.add(rp.getString("content"));// content
 						params.add("CHECKIN");// status
-						params.add(pp.getString("checkinUser"));// checkinUser
-						params.add(pp.getString("checkinDate"));// checkinDate
-						params.add(pp.getString("inFin"));// inFin
-						params.add(pp.getString("finLink"));// finLink
+						params.add(rp.getString("checkinUser"));// checkinUser
+						params.add(rp.getString("checkinDate"));// checkinDate
+						params.add(rp.getString("inFin"));// inFin
+						params.add(rp.getString("finLink"));// finLink
 						connection.updateWithParams(sql, params, r -> {
 							if (r.succeeded()) {
 								promise.complete(newId);
@@ -142,13 +146,13 @@ public class CommonHandler {
 				Function<Integer, Future<Integer>> cf = newId -> {
 					Future<Integer> f = Future.future(promise -> {
 						List<String> sqls = new ArrayList<String>();
-						String containerList = pp.getString("containerList");
+						String containerList = rp.getString("containerList");
 						if (containerList != null) {
 							String cntrs[] = containerList.split(",");
 							for (String cntr : cntrs) {
 								if (cntr.trim() != "") {
-									sqls.add("insert into contact_cntrs(contactid,cntrid) values("
-											+ pp.getInteger("newId") + ",'" + cntr + "')");
+									sqls.add("insert into contact_cntrs(contactid,cntrid) values(" + newId + ",'" + cntr
+											+ "')");
 								}
 							}
 						}
@@ -171,11 +175,11 @@ public class CommonHandler {
 						lm.add(UUID.randomUUID().toString());
 						lm.add(newId);
 						lm.add("CHECKIN");
-						lm.add("用户" + pp.getString("checkinUser") + "登记了IT工作联系单.");
+						lm.add("用户" + rp.getString("checkinUser") + "登记了IT工作联系单.");
 						lm.add("");
 						lm.add("");
-						lm.add(pp.getString("checkinUser"));
-						lm.add(pp.getString("checkinDate"));
+						lm.add(rp.getString("checkinUser"));
+						lm.add(rp.getString("checkinDate"));
 						connection.updateWithParams(sql, lm, r -> {
 							if (r.succeeded()) {
 								promise.complete(newId);
@@ -186,77 +190,84 @@ public class CommonHandler {
 					});
 					return f;
 				};
+
 				// 2.1修改-联系单状态
-				Future<String> checkf = Future.future(promise -> {
-					String sql = "select status from contact where contactid = ?";
-					JsonArray params = new JsonArray().add(pp.getInteger("contactId"));
-					connection.querySingleWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							if (!"CHECKIN".equals(r.result().getString(0))) {
-								promise.complete();
-							} else {
-								promise.fail("不是登记状态不能修改联系单内容。");
-							}
-						}
-					});
-				});
-				// 2.2修改-修改联系单内容
-				Future<String> uf = Future.future(promise -> {
-					String originContactType = pp.getString("originContactType");
-					String contactType = pp.getString("contactType");
-					String originFinLink = pp.getString("originFinLink");
-					String finLink = pp.getString("finLink");
-					String originContent = pp.getString("originContent");
-					String content = pp.getString("content");
-					String statusDesc = "";
-					boolean chg = false;
-					if (!originFinLink.equals(finLink)) {
-						statusDesc += "用户" + pp.getString("operator") + "修改了审批标记，从" + originFinLink + "改为" + finLink
-								+ "。";
-						chg = true;
-					}
-					if (!originContent.equals(content)) {
-						statusDesc += "用户" + pp.getString("operator") + "修改了工作联系单内容。";
-						chg = true;
-					}
-					if (!originContactType.equals(contactType)) {
-						statusDesc += "用户" + pp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
-								+ contactType + "。";
-						chg = true;
-					}
-					final String status = statusDesc;
-					if (chg) {
-						String sql = "update contact set contactType = ?,content = ?,finlink = ? where contactid = ?";
-						JsonArray params = new JsonArray();
-						params.add(pp.getString("contactType"));
-						params.add(pp.getString("content"));
-						params.add(pp.getString("finLink"));
-						params.add(pp.getInteger("contactId"));
-						connection.updateWithParams(sql, params, r -> {
+				Supplier<Future<String>> checkf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "select status from contact where contactid = ?";
+						JsonArray params = new JsonArray().add(rp.getInteger("contactId"));
+						connection.querySingleWithParams(sql, params, r -> {
 							if (r.succeeded()) {
-								promise.complete(status);
-							} else {
-								promise.fail("update contact error.");
+								if ("CHECKIN".equals(r.result().getString(0))) {
+									promise.complete();
+								} else {
+									promise.fail("不是登记状态不能修改联系单内容。");
+								}
 							}
 						});
-					} else {
-						promise.fail("没有任何变动，无需修改。");
-					}
-				});
+					});
+					return f;
+				};
+				// 2.2修改-修改联系单内容
+				Supplier<Future<String>> uf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String originContactType = rp.getString("originContactType");
+						String contactType = rp.getString("contactType");
+						String originFinLink = rp.getString("originFinLink");
+						String finLink = rp.getString("finLink");
+						String originContent = rp.getString("originContent");
+						String content = rp.getString("content");
+						String statusDesc = "";
+						boolean chg = false;
+						if (!originFinLink.equals(finLink)) {
+							statusDesc += "用户" + rp.getString("operator") + "修改了审批标记，从" + originFinLink + "改为" + finLink
+									+ "。";
+							chg = true;
+						}
+						if (!originContent.equals(content)) {
+							statusDesc += "用户" + rp.getString("operator") + "修改了工作联系单内容。";
+							chg = true;
+						}
+						if (!originContactType.equals(contactType)) {
+							statusDesc += "用户" + rp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
+									+ contactType + "。";
+							chg = true;
+						}
+						final String status = statusDesc;
+						if (chg) {
+							String sql = "update contact set contactType = ?,content = ?,finlink = ? where contactid = ?";
+							JsonArray params = new JsonArray();
+							params.add(rp.getString("contactType"));
+							params.add(rp.getString("content"));
+							params.add(rp.getString("finLink"));
+							params.add(rp.getInteger("contactId"));
+							connection.updateWithParams(sql, params, r -> {
+								if (r.succeeded()) {
+									promise.complete(status);
+								} else {
+									promise.fail("update contact error.");
+								}
+							});
+						} else {
+							promise.fail("没有任何变动，无需修改。");
+						}
+					});
+					return f;
+				};
 				// 2.3修改-保存日志
 				Function<String, Future<String>> ulf = statusDesc -> {
 					Future<String> f = Future.future(promise -> {
 						JsonArray params = new JsonArray();
 						params.add(UUID.randomUUID().toString());
-						params.add(pp.getInteger("contactId"));
+						params.add(rp.getInteger("contactId"));
 						params.add("MODIFY");
 						params.add(statusDesc);
-						params.add(pp.getString("originContent"));
-						params.add(pp.getString("content"));
-						params.add(pp.getString("tag1"));
-						params.add(pp.getString("tagContent1"));
-						params.add(pp.getString("operator"));
-						params.add(pp.getString("operationDate"));
+						params.add(rp.getString("originContent"));
+						params.add(rp.getString("content"));
+						params.add(rp.getString("tag1"));
+						params.add(rp.getString("tagContent1"));
+						params.add(rp.getString("operator"));
+						params.add(rp.getString("operationDate"));
 						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
 								+ "previouscontent,aftercontent,tag1,tagcontent1,operator,operationdate) "//
 								+ "values(?,?,?,?,?,?,?,?,?,?)";
@@ -271,9 +282,9 @@ public class CommonHandler {
 					return f;
 				};
 				// 0 传入参数中ID不为空，说明是修改，如果ID为空，那么需要先得到ID
-				int pageId = pp.getInteger("contactId");
+				int pageId = rp.getInteger("contactId");
 				if (pageId <= 0) {
-					getIdFuture.compose(r -> {
+					getIdFuture.get().compose(r -> {
 						return sf.apply(r);
 					}).compose(r -> {
 						return cf.apply(r);
@@ -283,8 +294,8 @@ public class CommonHandler {
 						if (r.succeeded()) {
 							String message = "联系单" + r.result() + "已创建";
 							notifyHandler.sendMsg(r.result(), message);
-							uploadHandler.fileTheDocument(pp.getString("checkinUser"), r.result(),
-									pp.getString("fileList"));
+							uploadHandler.fileTheDocument(rp.getString("checkinUser"), r.result(),
+									rp.getString("fileList"));
 							res.end(result.ok().toString());
 						} else {
 							res.end(result.err(r.cause().getMessage()).toString());
@@ -292,14 +303,14 @@ public class CommonHandler {
 						connection.close();
 					});
 				} else {
-					checkf.compose(r -> {
-						return uf;
+					checkf.get().compose(r -> {
+						return uf.get();
 					}).compose(r -> {
 						return ulf.apply(r);
 					}).setHandler(r -> {
 						if (r.succeeded()) {
-							String message = "联系单" + pp.getInteger("contactId") + "已修改";
-							notifyHandler.sendMsg(pp.getInteger("contactId"), message);
+							String message = "联系单" + rp.getInteger("contactId") + "已修改";
+							notifyHandler.sendMsg(rp.getInteger("contactId"), message);
 							res.end(result.ok().toString());
 						} else {
 							res.end(result.err(r.cause().getMessage()).toString());
@@ -307,8 +318,11 @@ public class CommonHandler {
 						connection.close();
 					});
 				}
+			} else {
+				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
+
 	}
 
 	/**
@@ -329,55 +343,62 @@ public class CommonHandler {
 				String originContactType = rp.getString("originContactType");
 				String contactType = rp.getString("contactType");
 				// 1.修改
-				Future<String> uf = Future.future(promise -> {
-					String sql = "update contact set contactType = ?,iter = ?,itMark = ? where contactId = ?";
-					JsonArray params = new JsonArray();
-					params.add(contactType);
-					params.add(iter);
-					params.add(rp.getString("itMark"));
-					params.add(contactId);
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to update contact.");
-						}
-					});
-				});
-				// 2.日志
-				Future<String> lf = Future.future(promise -> {
-					String statusDesc = "";
-					if (!Utils.strEquals(originIter, iter)) {
-						statusDesc += "用户" + rp.getString("operator") + "修改了IT处理人员，从" + originIter + "改为" + iter + "。";
-					}
-					if (!Utils.strEquals(originContactType, contactType)) {
-						statusDesc += "用户" + rp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
-								+ contactType + "。";
-					}
-					if ("".equals(statusDesc)) {
-						promise.complete();// 如果只是修改IT备注或未修改，那么不记录备注。
-					} else {
-						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
-								+ "operator,operationdate) values(?,?,?,?,?,?)";
+				Supplier<Future<String>> uf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set contactType = ?,iter = ?,itMark = ? where contactId = ?";
 						JsonArray params = new JsonArray();
-						params.add(UUID.randomUUID().toString());
+						params.add(contactType);
+						params.add(iter);
+						params.add(rp.getString("itMark"));
 						params.add(contactId);
-						params.add("MODIFY");
-						params.add(statusDesc);
-						params.add(rp.getString("operator"));
-						params.add(rp.getString("operationDate"));
 						connection.updateWithParams(sql, params, r -> {
 							if (r.succeeded()) {
 								promise.complete();
 							} else {
-								promise.fail("fail to save update log.");
+								promise.fail("fail to update contact.");
 							}
 						});
-					}
-				});
+					});
+					return f;
+				};
+				// 2.日志
+				Supplier<Future<String>> lf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String statusDesc = "";
+						if (!Utils.strEquals(originIter, iter)) {
+							statusDesc += "用户" + rp.getString("operator") + "修改了IT处理人员，从" + originIter + "改为" + iter
+									+ "。";
+						}
+						if (!Utils.strEquals(originContactType, contactType)) {
+							statusDesc += "用户" + rp.getString("operator") + "修改了工作联系单类别，从" + originContactType + "改为"
+									+ contactType + "。";
+						}
+						if ("".equals(statusDesc)) {
+							promise.complete();// 如果只是修改IT备注或未修改，那么不记录备注。
+						} else {
+							String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
+									+ "operator,operationdate) values(?,?,?,?,?,?)";
+							JsonArray params = new JsonArray();
+							params.add(UUID.randomUUID().toString());
+							params.add(contactId);
+							params.add("MODIFY");
+							params.add(statusDesc);
+							params.add(rp.getString("operator"));
+							params.add(rp.getString("operationDate"));
+							connection.updateWithParams(sql, params, r -> {
+								if (r.succeeded()) {
+									promise.complete();
+								} else {
+									promise.fail("fail to save update log.");
+								}
+							});
+						}
+					});
+					return f;
+				};
 				// 3.EXCUTE
-				uf.compose(r -> {
-					return lf;
+				uf.get().compose(r -> {
+					return lf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						res.end(result.ok().toString());
@@ -386,6 +407,8 @@ public class CommonHandler {
 					}
 					connection.close();
 				});
+			} else {
+				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
 
@@ -407,35 +430,45 @@ public class CommonHandler {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.检查状态
-				Future<String> checkf = Future.future(promise -> {
-					String sql = "select * from contact_log where contactId = ? and status = 'ACCEPTED'";
-					JsonArray params = new JsonArray().add(contactId);
-					connection.queryWithParams(sql, params, r -> {
-						if (r.succeeded() && r.result().getRows().size() > 0) {
-							promise.complete();
-						} else {
-							promise.fail("工作联系单已被IT部受理,不能删除,请联系IT部取消");
-						}
+				Supplier<Future<String>> checkf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "select * from contact_log where contactId = ? and status = 'ACCEPTED'";
+						JsonArray params = new JsonArray().add(contactId);
+						connection.queryWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								if (r.result().getRows().size() > 0){
+									promise.fail("工作联系单已被IT部受理,不能删除,请联系IT部取消");
+								}else{
+									promise.complete();
+								}
+							} else {
+								promise.fail("fila to del contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 2.修改
-				Future<String> updatef = Future.future(promise -> {
-					String sql = "update contact set indt = 'Y',delUser = ?,delDate = ? where contactId = ?";
-					JsonArray params = new JsonArray();
-					params.add(delUser);
-					params.add(delDate);
-					params.add(contactId);
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to del contact.");
-						}
+				Supplier<Future<String>> updatef = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set indt = 'Y',delUser = ?,delDate = ? where contactId = ?";
+						JsonArray params = new JsonArray();
+						params.add(delUser);
+						params.add(delDate);
+						params.add(contactId);
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to del contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 3.EXECUTE
-				checkf.compose(r -> {
-					return updatef;
+				checkf.get().compose(r -> {
+					return updatef.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						String message = "工作联系单" + contactId + "已删除";
@@ -445,6 +478,8 @@ public class CommonHandler {
 						res.end(result.err(r.cause().getMessage()).toString());
 					}
 				});
+			} else {
+				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
 
@@ -463,46 +498,52 @@ public class CommonHandler {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.受理
-				Future<String> updatef = Future.future(promise -> {
-					String sql = "update contact set iter = ?,status = ? where contactId = ?";
-					JsonArray params = new JsonArray();
-					params.add(rp.getString("iter"));
-					params.add("ACCEPTED");
-					params.add(rp.getInteger("contactId"));
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to update contact.");
-						}
+				Supplier<Future<String>> updatef = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set iter = ?,status = ? where contactId = ?";
+						JsonArray params = new JsonArray();
+						params.add(rp.getString("iter"));
+						params.add("ACCEPTED");
+						params.add(rp.getInteger("contactId"));
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to update contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 2.日志
-				Future<String> logf = Future.future(promise -> {
-					String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
-							+ "tag1,tagContent1,tag2,tagContent2,operator,operationdate) " //
-							+ "values(?,?,?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
-					JsonArray params = new JsonArray();
-					params.add(UUID.randomUUID().toString());
-					params.add(rp.getInteger("contactId"));
-					params.add("ACCEPTED");
-					params.add("用户" + rp.getString("operator") + "受理了IT工作联系单。目前由" + rp.getString("iter") + "负责处理。");
-					params.add(rp.getString("tag1"));
-					params.add(rp.getString("tagContent1"));
-					params.add(rp.getString("tag2"));
-					params.add(rp.getString("tagContent2"));
-					params.add(rp.getString("operator"));
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to save log.");
-						}
+				Supplier<Future<String>> logf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
+								+ "tag1,tagContent1,tag2,tagContent2,operator,operationdate) " //
+								+ "values(?,?,?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
+						JsonArray params = new JsonArray();
+						params.add(UUID.randomUUID().toString());
+						params.add(rp.getInteger("contactId"));
+						params.add("ACCEPTED");
+						params.add("用户" + rp.getString("operator") + "受理了IT工作联系单。目前由" + rp.getString("iter") + "负责处理。");
+						params.add(rp.getString("tag1"));
+						params.add(rp.getString("tagContent1"));
+						params.add(rp.getString("tag2"));
+						params.add(rp.getString("tagContent2"));
+						params.add(rp.getString("operator"));
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to save log.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 3.EXCUTE
-				updatef.compose(r -> {
-					return logf;
+				updatef.get().compose(r -> {
+					return logf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "已受理";
@@ -517,6 +558,7 @@ public class CommonHandler {
 				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
+
 	}
 
 	/**
@@ -533,45 +575,51 @@ public class CommonHandler {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.受理
-				Future<String> updatef = Future.future(promise -> {
-					String sql = "update contact set status = ? where contactId = ?";
-					JsonArray params = new JsonArray();
-					params.add(newStatus);
-					params.add(rp.getInteger("contactId"));
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to update contact.");
-						}
+				Supplier<Future<String>> updatef = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set status = ? where contactId = ?";
+						JsonArray params = new JsonArray();
+						params.add(newStatus);
+						params.add(rp.getInteger("contactId"));
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to update contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 2.日志
-				Future<String> logf = Future.future(promise -> {
-					String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
-							+ "tag1,tagContent1,tag2,tagContent2,operator,operationdate) " //
-							+ "values(?,?,?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
-					JsonArray params = new JsonArray();
-					params.add(UUID.randomUUID().toString());
-					params.add(rp.getInteger("contactId"));
-					params.add(rp.getString("newStatus"));
-					params.add("用户" + rp.getString("operator") + "将IT工作联系单状态置为" + newStatus);
-					params.add(rp.getString("tag1"));
-					params.add(rp.getString("tagContent1"));
-					params.add(rp.getString("tag2"));
-					params.add(rp.getString("tagContent2"));
-					params.add(rp.getString("operator"));
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to save log.");
-						}
+				Supplier<Future<String>> logf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
+								+ "tag1,tagContent1,tag2,tagContent2,operator,operationdate) " //
+								+ "values(?,?,?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
+						JsonArray params = new JsonArray();
+						params.add(UUID.randomUUID().toString());
+						params.add(rp.getInteger("contactId"));
+						params.add(rp.getString("newStatus"));
+						params.add("用户" + rp.getString("operator") + "将IT工作联系单状态置为" + newStatus);
+						params.add(rp.getString("tag1"));
+						params.add(rp.getString("tagContent1"));
+						params.add(rp.getString("tag2"));
+						params.add(rp.getString("tagContent2"));
+						params.add(rp.getString("operator"));
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to save log.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 3.EXCUTE
-				updatef.compose(r -> {
-					return logf;
+				updatef.get().compose(r -> {
+					return logf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "状态改变为" + newStatus;
@@ -586,6 +634,7 @@ public class CommonHandler {
 				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
+
 	}
 
 	/**
@@ -602,41 +651,47 @@ public class CommonHandler {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.退回
-				Future<String> updatef = Future.future(promise -> {
-					String sql = "update contact set status = 'CHECKIN' where contactId = ? ";
-					JsonArray params = new JsonArray().add(contactId);
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to update contact.");
-						}
+				Supplier<Future<String>> updatef = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set status = 'CHECKIN' where contactId = ? ";
+						JsonArray params = new JsonArray().add(contactId);
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to update contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 2.日志
-				Future<String> logf = Future.future(promise -> {
-					String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
-							+ "tag1,tagcontent1,operator,operationdate) "//
-							+ "values(?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
-					JsonArray params = new JsonArray();
-					params.add(UUID.randomUUID().toString());
-					params.add(rp.getInteger("contactId"));
-					params.add("GOBACK");
-					params.add("用户" + rp.getString("operator") + "将工作联系单状态回退到登记状态。");
-					params.add(rp.getString("tag1"));
-					params.add(rp.getString("tagContent1"));
-					params.add(rp.getString("operator"));
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to save log.");
-						}
+				Supplier<Future<String>> logf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
+								+ "tag1,tagcontent1,operator,operationdate) "//
+								+ "values(?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
+						JsonArray params = new JsonArray();
+						params.add(UUID.randomUUID().toString());
+						params.add(rp.getInteger("contactId"));
+						params.add("GOBACK");
+						params.add("用户" + rp.getString("operator") + "将工作联系单状态回退到登记状态。");
+						params.add(rp.getString("tag1"));
+						params.add(rp.getString("tagContent1"));
+						params.add(rp.getString("operator"));
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to save log.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 3.EXCUTE
-				updatef.compose(r -> {
-					return logf;
+				updatef.get().compose(r -> {
+					return logf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "状态退回到CHECKIN";
@@ -651,6 +706,7 @@ public class CommonHandler {
 				res.end(result.err("fail to get db connection.").toString());
 			}
 		});
+
 	}
 
 	/**
@@ -683,7 +739,7 @@ public class CommonHandler {
 		JsonObject rp = ctx.getBodyAsJson();
 		String sql = "select a.*,b.contactType from contact_log a,contact b " + //
 				" where a.contactId = ? and a.contactId = b.contactId order by a.operationdate";
-		JsonArray params = new JsonArray().add(rp.getString("contactId"));
+		JsonArray params = new JsonArray().add(rp.getInteger("contactId"));
 		JdbcHelper.rows(ctx, sql, params);
 	}
 
@@ -703,8 +759,8 @@ public class CommonHandler {
 	public void singleContact(RoutingContext ctx) {
 		JsonObject rp = ctx.getBodyAsJson();
 		String sql = "select * from contact where contactId = ?";
-		JsonArray params = new JsonArray().add(rp.getString("contactId"));
-		JdbcHelper.rows(ctx, sql, params);
+		JsonArray params = new JsonArray().add(rp.getInteger("contactId"));
+		JdbcHelper.oneRow(ctx, sql, params);
 	}
 
 	public NotifyHandler getNotifyHandler() {

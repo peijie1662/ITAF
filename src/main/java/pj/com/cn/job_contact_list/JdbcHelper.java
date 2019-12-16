@@ -62,8 +62,47 @@ public class JdbcHelper {
 			});
 		} catch (Exception e) {
 			res.end(result.err(e.getMessage()).toString());
+			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * 查询数据集(1)
+	 * 
+	 * @param ctx
+	 * @param sql
+	 * @param params
+	 */
+	public static void oneRow(RoutingContext ctx, String sql, JsonArray params) {
+		HttpServerResponse res = ctx.response();
+		res.putHeader("content-type", "application/json");
+		SQLClient client = ConfigVerticle.client;
+		CallResult<JsonObject> result = new CallResult<JsonObject>();
+		try {
+			client.getConnection(cr -> {
+				if (cr.succeeded()) {
+					SQLConnection connection = cr.result();
+					if (connection != null) {
+						connection.queryWithParams(sql, params, qr -> {
+							if (qr.succeeded()) {
+								res.end(result.ok(qr.result().getRows().get(0)).toString());
+							} else {
+								res.end(result.err().toString());
+							}
+							connection.close();
+						});
+					} else {
+						res.end(result.err("the DB connect is null.").toString());
+					}
+				} else {
+					res.end(result.err("get DB connect err.").toString());
+				}
+			});
+		} catch (Exception e) {
+			res.end(result.err(e.getMessage()).toString());
+			e.printStackTrace();
+		}
+	}	
 
 	/**
 	 * 修改记录
@@ -100,6 +139,7 @@ public class JdbcHelper {
 			});
 		} catch (Exception e) {
 			res.end(result.err(e.getMessage()).toString());
+			e.printStackTrace();
 		}
 	}
 

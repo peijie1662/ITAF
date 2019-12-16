@@ -25,7 +25,6 @@ public class TaskVerticle extends AbstractVerticle{
 		// 定时注册服务
 		vertx.setPeriodic(5000, timerId -> {
 			try {
-				System.out.println("register..."+Thread.currentThread().getName());
 				provider.put("ip", InetAddress.getLocalHost().getHostAddress());
 				wc.post(registerUrl.getInteger("port"), registerUrl.getString("ip"), registerUrl.getString("url"))
 						.timeout(1000).sendJsonObject(provider, ar -> {

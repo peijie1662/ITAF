@@ -48,7 +48,7 @@ public class NotifyHandler {
 
 	/**
 	 * 联系单状态改变消息 <br>
-	 * 注意,这种调用方式未加入串联,对返回结果也并未处理
+	 * 注意,这种调用方式未加入串联,对返回结果也并未处理 
 	 */
 	public void sendMsg(int contactId, String message) {
 		CallResult<String> result = new CallResult<String>();

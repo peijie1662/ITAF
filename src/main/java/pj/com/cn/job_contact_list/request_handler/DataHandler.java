@@ -3,6 +3,8 @@ package pj.com.cn.job_contact_list.request_handler;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
+
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonArray;
@@ -108,41 +110,47 @@ public class DataHandler {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
 				// 1.审核
-				Future<String> updatef = Future.future(promise -> {
-					String sql = "update contact set infin = 'Y' where contactId = ?";
-					JsonArray params = new JsonArray().add(contactId);
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to update contact.");
-						}
+				Supplier<Future<String>> updatef = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "update contact set infin = 'Y' where contactId = ?";
+						JsonArray params = new JsonArray().add(contactId);
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to update contact.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 2.日志
-				Future<String> logf = Future.future(promise -> {
-					String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
-							+ "tag1,tagContent1,operator,operationdate) " //
-							+ "values(?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
-					JsonArray params = new JsonArray();
-					params.add(UUID.randomUUID().toString());
-					params.add(contactId);
-					params.add("FINAGREE");
-					params.add("用户" + checker + "审核了IT工作联系单.");
-					params.add("财务审核");
-					params.add(finReply);
-					params.add(checker);
-					connection.updateWithParams(sql, params, r -> {
-						if (r.succeeded()) {
-							promise.complete();
-						} else {
-							promise.fail("fail to save log.");
-						}
+				Supplier<Future<String>> logf = () -> {
+					Future<String> f = Future.future(promise -> {
+						String sql = "insert into contact_log(logId,contactId,status,statusdesc," //
+								+ "tag1,tagContent1,operator,operationdate) " //
+								+ "values(?,?,?,?,?,?,?," + JdbcHelper.toDbDate(new Date()) + ")";
+						JsonArray params = new JsonArray();
+						params.add(UUID.randomUUID().toString());
+						params.add(contactId);
+						params.add("FINAGREE");
+						params.add("用户" + checker + "审核了IT工作联系单.");
+						params.add("财务审核");
+						params.add(finReply);
+						params.add(checker);
+						connection.updateWithParams(sql, params, r -> {
+							if (r.succeeded()) {
+								promise.complete();
+							} else {
+								promise.fail("fail to save log.");
+							}
+						});
 					});
-				});
+					return f;
+				};
 				// 3.EXCUTE
-				updatef.compose(r -> {
-					return logf;
+				updatef.get().compose(r -> {
+					return logf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
 						String message = "联系单" + contactId + "财务审核通过";
