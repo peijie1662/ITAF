@@ -36,18 +36,14 @@ public class MainVerticle extends AbstractVerticle {
 		router.route().handler(BodyHandler.create());
 		UploadHandler uploadHandler = new UploadHandler(vertx);
 		// 通用联系单处理
-		CommonHandler commonHandler = new CommonHandler();
-		commonHandler.setNotifyHandler(notifyHandler);
-		commonHandler.setUploadHandler(uploadHandler);
+		CommonHandler commonHandler = new CommonHandler().setNotifyHandler(notifyHandler)
+				.setUploadHandler(uploadHandler);
 		// 数据联系单处理
-		DataHandler dataHandler = new DataHandler();
-		dataHandler.setNotifyHandler(notifyHandler);
+		DataHandler dataHandler = new DataHandler().setNotifyHandler(notifyHandler);
 		// 开发联系单处理
-		DevHandler devHandler = new DevHandler();
-		devHandler.setNotifyHandler(notifyHandler);
+		DevHandler devHandler = new DevHandler().setNotifyHandler(notifyHandler);
 		// 改进项目处理
 		ImproveHandler improveHandler = new ImproveHandler();
-		improveHandler.setNotifyHandler(notifyHandler);
 		// 登录
 		router.post("/login").blockingHandler(commonHandler::handleLogin, false);
 		// 单个联系单

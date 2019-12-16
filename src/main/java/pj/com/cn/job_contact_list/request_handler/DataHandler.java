@@ -24,12 +24,9 @@ public class DataHandler {
 
 	private NotifyHandler notifyHandler;
 
-	public NotifyHandler getNotifyHandler() {
-		return notifyHandler;
-	}
-
-	public void setNotifyHandler(NotifyHandler notifyHandler) {
+	public DataHandler setNotifyHandler(NotifyHandler notifyHandler) {
 		this.notifyHandler = notifyHandler;
+		return this;
 	}
 
 	/**

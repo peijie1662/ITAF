@@ -33,6 +33,16 @@ public class CommonHandler {
 
 	private UploadHandler uploadHandler;
 
+	public CommonHandler setNotifyHandler(NotifyHandler notifyHandler) {
+		this.notifyHandler = notifyHandler;
+		return this;
+	}
+
+	public CommonHandler setUploadHandler(UploadHandler uploadHandler) {
+		this.uploadHandler = uploadHandler;
+		return this;
+	}
+
 	/**
 	 * 登录
 	 */
@@ -761,22 +771,6 @@ public class CommonHandler {
 		String sql = "select * from contact where contactId = ?";
 		JsonArray params = new JsonArray().add(rp.getInteger("contactId"));
 		JdbcHelper.oneRow(ctx, sql, params);
-	}
-
-	public NotifyHandler getNotifyHandler() {
-		return notifyHandler;
-	}
-
-	public void setNotifyHandler(NotifyHandler notifyHandler) {
-		this.notifyHandler = notifyHandler;
-	}
-
-	public UploadHandler getUploadHandler() {
-		return uploadHandler;
-	}
-
-	public void setUploadHandler(UploadHandler uploadHandler) {
-		this.uploadHandler = uploadHandler;
 	}
 
 }

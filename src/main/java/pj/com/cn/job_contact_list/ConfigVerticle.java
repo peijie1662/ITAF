@@ -45,7 +45,7 @@ public class ConfigVerticle {
 	static {
 		byte[] buff = new byte[102400];
 		try {
-			new FileInputStream(new File("d:/jcl.json")).read(buff);
+			new FileInputStream(new File("./jcl.json")).read(buff);
 			config = new JsonObject(new String(buff, "utf-8"));
 			registerUrl = config.getJsonObject("registerUrl");
 			loginServer = config.getString("loginServer");

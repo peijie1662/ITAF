@@ -10,8 +10,6 @@ import pj.com.cn.job_contact_list.JdbcHelper;
  */
 public class ImproveHandler {
 
-	private NotifyHandler notifyHandler;
-
 	/**
 	 * 开发工作联系单列表
 	 */
@@ -36,14 +34,6 @@ public class ImproveHandler {
 		// 查询
 		sql += " order by checkindate desc";
 		JdbcHelper.rows(ctx, sql);
-	}
-
-	public NotifyHandler getNotifyHandler() {
-		return notifyHandler;
-	}
-
-	public void setNotifyHandler(NotifyHandler notifyHandler) {
-		this.notifyHandler = notifyHandler;
 	}
 
 }

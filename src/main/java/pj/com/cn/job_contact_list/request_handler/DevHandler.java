@@ -23,6 +23,11 @@ public class DevHandler {
 
 	private NotifyHandler notifyHandler;
 
+	public DevHandler setNotifyHandler(NotifyHandler notifyHandler) {
+		this.notifyHandler = notifyHandler;
+		return this;
+	}
+
 	/**
 	 * 开发工作联系单列表
 	 */
@@ -154,14 +159,6 @@ public class DevHandler {
 				" and a.status = 'ONLINE' " + //
 				" order by operationdate desc ) aa where rownum <= 5 ";
 		JdbcHelper.rows(ctx, sql);
-	}
-
-	public NotifyHandler getNotifyHandler() {
-		return notifyHandler;
-	}
-
-	public void setNotifyHandler(NotifyHandler notifyHandler) {
-		this.notifyHandler = notifyHandler;
 	}
 
 }
