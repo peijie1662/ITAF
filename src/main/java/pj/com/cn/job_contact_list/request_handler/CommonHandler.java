@@ -21,7 +21,7 @@ import io.vertx.ext.web.client.WebClient;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.JdbcHelper;
 import pj.com.cn.job_contact_list.Utils;
-import pj.com.cn.job_contact_list.model.CallResult;
+import static pj.com.cn.job_contact_list.model.CallResult.*;
 
 /**
  * @author PJ
@@ -51,7 +51,6 @@ public class CommonHandler {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		JsonObject params = ctx.getBodyAsJson();
-		CallResult<JSONObject> result = new CallResult<JSONObject>();
 		// 1.寻找登录服务
 		try {
 			WebClient webClient = WebClient.create(vertx);
@@ -72,26 +71,21 @@ public class CommonHandler {
 							if (h.succeeded()) {
 								JSONObject lr = h.result().bodyAsJson(JSONObject.class);
 								if (lr.getBoolean("flag")) {
-									result.ok(JSONObject.parseObject(lr.getString("outMsg")));
-									res.end(result.toString());
+									res.end(OK(JSONObject.parseObject(lr.getString("outMsg"))));
 								} else {
-									result.err("访问登录服务出错:" + lr.getString("errMsg"));
-									res.end(result.toString());
+									res.end(Err("访问登录服务出错:" + lr.getString("errMsg")));
 								}
 							} else {
-								result.err("无法访问登录服务:" + h.cause().getMessage());
-								res.end(result.toString());
+								res.end(Err("无法访问登录服务:" + h.cause().getMessage()));
 							}
 						});
 					} else {
-						result.err("访问注册出错:" + r.getString("errMsg"));
-						res.end(result.toString());
+						res.end(Err("访问注册出错:" + r.getString("errMsg")));
 					}
 				}
 			});
 		} catch (Exception e) {
-			result.err("登录出错:" + e.getMessage());
-			res.end(result.toString());
+			res.end(Err("登录出错:" + e.getMessage()));
 		}
 	}
 
@@ -102,7 +96,6 @@ public class CommonHandler {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		JsonObject rp = ctx.getBodyAsJson();
-		CallResult<String> result = new CallResult<String>();
 		SQLClient client = ConfigVerticle.client;
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
@@ -306,9 +299,9 @@ public class CommonHandler {
 							notifyHandler.sendMsg(r.result(), message);
 							uploadHandler.fileTheDocument(rp.getString("checkinUser"), r.result(),
 									rp.getString("fileList"));
-							res.end(result.ok().toString());
+							res.end(OK());
 						} else {
-							res.end(result.err(r.cause().getMessage()).toString());
+							res.end(Err(r.cause().getMessage()));
 						}
 						connection.close();
 					});
@@ -321,15 +314,15 @@ public class CommonHandler {
 						if (r.succeeded()) {
 							String message = "联系单" + rp.getInteger("contactId") + "已修改";
 							notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-							res.end(result.ok().toString());
+							res.end(OK());
 						} else {
-							res.end(result.err(r.cause().getMessage()).toString());
+							res.end(Err(r.cause().getMessage()));
 						}
 						connection.close();
 					});
 				}
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 
@@ -342,7 +335,6 @@ public class CommonHandler {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		JsonObject rp = ctx.getBodyAsJson();
-		CallResult<String> result = new CallResult<String>();
 		SQLClient client = ConfigVerticle.client;
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
@@ -411,14 +403,14 @@ public class CommonHandler {
 					return lf.get();
 				}).setHandler(r -> {
 					if (r.succeeded()) {
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 
@@ -430,7 +422,6 @@ public class CommonHandler {
 	public void handleDel(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		CallResult<String> result = new CallResult<String>();
 		SQLClient client = ConfigVerticle.client;
 		JsonObject rp = ctx.getBodyAsJson();
 		int contactId = rp.getInteger("contactId");
@@ -483,13 +474,13 @@ public class CommonHandler {
 					if (r.succeeded()) {
 						String message = "工作联系单" + contactId + "已删除";
 						notifyHandler.sendMsg(contactId, message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 
@@ -503,7 +494,6 @@ public class CommonHandler {
 		res.putHeader("content-type", "application/json");
 		JsonObject rp = ctx.getBodyAsJson();
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
@@ -558,14 +548,14 @@ public class CommonHandler {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "已受理";
 						notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 
@@ -579,7 +569,6 @@ public class CommonHandler {
 		res.putHeader("content-type", "application/json");
 		JsonObject rp = ctx.getBodyAsJson();
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		String newStatus = rp.getString("newStatus");
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
@@ -634,14 +623,14 @@ public class CommonHandler {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "状态改变为" + newStatus;
 						notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 
@@ -656,7 +645,6 @@ public class CommonHandler {
 		JsonObject rp = ctx.getBodyAsJson();
 		int contactId = rp.getInteger("contactId");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
@@ -706,14 +694,14 @@ public class CommonHandler {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "状态退回到CHECKIN";
 						notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 

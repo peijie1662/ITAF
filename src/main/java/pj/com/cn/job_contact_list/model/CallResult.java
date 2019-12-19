@@ -28,20 +28,20 @@ public class CallResult<T> {
 		return flag;
 	}
 
-	public static <T> CallResult<T> OK() {
-		return new CallResult<T>(true, null, "");
+	public static <T> String OK() {
+		return new CallResult<T>(true, null, "").toString();
 	}
 
-	public static <T> CallResult<T> OK(T data) {
-		return new CallResult<T>(true, data, "");
+	public static <T> String OK(T data) {
+		return new CallResult<T>(true, data, "").toString();
 	}
 
-	public static <T> CallResult<T> Err() {
-		return new CallResult<T>(false, null, "");
+	public static <T> String Err() {
+		return new CallResult<T>(false, null, "").toString();
 	}
 
-	public static <T> CallResult<T> Err(String errMsg) {
-		return new CallResult<T>(false, null, errMsg);
+	public static <T> String Err(String errMsg) {
+		return new CallResult<T>(false, null, errMsg).toString();
 	}
 
 	public CallResult<T> ok() {

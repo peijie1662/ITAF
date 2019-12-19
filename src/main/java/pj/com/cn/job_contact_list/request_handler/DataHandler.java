@@ -14,7 +14,7 @@ import io.vertx.ext.sql.SQLConnection;
 import io.vertx.ext.web.RoutingContext;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.JdbcHelper;
-import pj.com.cn.job_contact_list.model.CallResult;
+import static pj.com.cn.job_contact_list.model.CallResult.*;
 
 /**
  * @author PJ
@@ -102,7 +102,6 @@ public class DataHandler {
 		String finReply = rp.getString("finReply");
 		String checker = rp.getString("checker");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
@@ -152,14 +151,14 @@ public class DataHandler {
 					if (r.succeeded()) {
 						String message = "联系单" + contactId + "财务审核通过";
 						notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 	}

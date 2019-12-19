@@ -13,7 +13,7 @@ import io.vertx.ext.sql.SQLConnection;
 import io.vertx.ext.web.RoutingContext;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.JdbcHelper;
-import pj.com.cn.job_contact_list.model.CallResult;
+import static pj.com.cn.job_contact_list.model.CallResult.*;
 
 /**
  * @author PJ
@@ -82,7 +82,6 @@ public class DevHandler {
 		JsonObject rp = ctx.getBodyAsJson();
 		int contactId = rp.getInteger("contactId");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		client.getConnection(cr -> {
 			if (cr.succeeded()) {
 				SQLConnection connection = cr.result();
@@ -132,14 +131,14 @@ public class DevHandler {
 					if (r.succeeded()) {
 						String message = "联系单" + rp.getInteger("contactId") + "通过领导审批。";
 						notifyHandler.sendMsg(rp.getInteger("contactId"), message);
-						res.end(result.ok().toString());
+						res.end(OK());
 					} else {
-						res.end(result.err(r.cause().getMessage()).toString());
+						res.end(Err(r.cause().getMessage()));
 					}
 					connection.close();
 				});
 			} else {
-				res.end(result.err("fail to get db connection.").toString());
+				res.end(Err("fail to get db connection."));
 			}
 		});
 	}

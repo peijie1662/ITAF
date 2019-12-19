@@ -16,7 +16,6 @@ import io.vertx.ext.web.RoutingContext;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.JdbcHelper;
 import pj.com.cn.job_contact_list.Utils;
-import pj.com.cn.job_contact_list.model.CallResult;
 
 /**
  * @author PJ
@@ -51,7 +50,6 @@ public class NotifyHandler {
 	 * 注意,这种调用方式未加入串联,对返回结果也并未处理 
 	 */
 	public void sendMsg(int contactId, String message) {
-		CallResult<String> result = new CallResult<String>();
 		SQLClient client = ConfigVerticle.client;
 		client.getConnection(res -> {
 			if (res.succeeded()) {
@@ -94,11 +92,6 @@ public class NotifyHandler {
 					});
 					return f2;
 				}).setHandler(fr -> {
-					if (fr.succeeded()) {
-						result.ok();
-					} else {
-						result.err(fr.result().toString());
-					}
 					connection.close();
 				});
 			}

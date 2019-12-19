@@ -17,12 +17,10 @@ public class TaskVerticle extends AbstractVerticle{
 	
 	@Override
 	public void start() throws Exception {
-		
 		JsonObject provider = ConfigVerticle.provider;
 		JsonObject registerUrl = ConfigVerticle.registerUrl;
 		WebClient wc = WebClient.create(vertx,
 				new WebClientOptions().setIdleTimeout(2).setConnectTimeout(2000).setMaxWaitQueueSize(5));
-		// 定时注册服务
 		vertx.setPeriodic(5000, timerId -> {
 			try {
 				provider.put("ip", InetAddress.getLocalHost().getHostAddress());

@@ -16,6 +16,8 @@ import io.vertx.ext.web.RoutingContext;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.model.CallResult;
 
+import static pj.com.cn.job_contact_list.model.CallResult.*;
+
 /**
  * @author PJ
  * @version 创建时间：2019年6月21日 下午2:02:58 文件上传
@@ -37,7 +39,6 @@ public class UploadHandler {
 	public void contactFileList(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		CallResult<List<String>> result = new CallResult<List<String>>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			JsonObject pp = ctx.getBodyAsJson();
@@ -49,12 +50,11 @@ public class UploadHandler {
 				fNames = fs.readDirBlocking(dir).stream().map(f -> f.substring(f.lastIndexOf("\\") + 1))
 						.collect(Collectors.toList());
 			}
-			result.ok(fNames);
+			res.end(OK(fNames));
 		} catch (Exception e) {
+			res.end(Err(e.getMessage()));
 			e.printStackTrace();
-			result.err(e.getMessage());
 		}
-		res.end(result.toString());
 	}
 
 	/**
@@ -65,7 +65,6 @@ public class UploadHandler {
 	public void uploadContact(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		CallResult<String> result = new CallResult<String>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			String userId = ctx.request().getFormAttribute("userId");
@@ -76,20 +75,20 @@ public class UploadHandler {
 				fs.mkdirsBlocking(userPath);
 			}
 			Set<FileUpload> uploads = ctx.fileUploads();
-			result.ok();
+			CallResult<String> result = new CallResult<String>().ok(); 
 			uploads.forEach(fileUpload -> {
 				String path = userPath + "/" + fileUpload.fileName();
 				fs.move(fileUpload.uploadedFileName(), path, new CopyOptions().setReplaceExisting(true), ar -> {
 					if (!ar.succeeded()) {
+						//fs.move is asynchronously,so not work...
 						result.err(ar.cause().getMessage());
 					}
 				});
 			});
 			res.end(result.toString());
 		} catch (Exception e) {
+			res.end(Err(e.getMessage()));
 			e.printStackTrace();
-			result.err(e.getMessage());
-			res.end(result.toString());
 		}
 	}
 
@@ -155,7 +154,6 @@ public class UploadHandler {
 	public void delContactFile(RoutingContext ctx) {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
-		CallResult<String> result = new CallResult<String>();
 		try {
 			FileSystem fs = vertx.fileSystem();
 			JsonObject pp = ctx.getBodyAsJson();
@@ -166,11 +164,10 @@ public class UploadHandler {
 					: CONTACT_UPLOAD_URL + userId + "/" + contactId;
 			filePath += "/" + fileName;
 			fs.deleteBlocking(filePath);
-			result.ok();
+			res.end(OK());
 		} catch (Exception e) {
+			res.end(e.getMessage());
 			e.printStackTrace();
-			result.err(e.getMessage());
 		}
-		res.end(result.toString());
 	}
 }

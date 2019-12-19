@@ -2,15 +2,12 @@ package pj.com.cn.job_contact_list;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
-
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
 import io.vertx.ext.sql.SQLClient;
 import io.vertx.ext.sql.SQLConnection;
 import io.vertx.ext.web.RoutingContext;
-import pj.com.cn.job_contact_list.model.CallResult;
+import static pj.com.cn.job_contact_list.model.CallResult.*;
 
 /**
  * @author PJ
@@ -39,7 +36,6 @@ public class JdbcHelper {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		try {
 			client.getConnection(cr -> {
 				if (cr.succeeded()) {
@@ -47,21 +43,21 @@ public class JdbcHelper {
 					if (connection != null) {
 						connection.queryWithParams(sql, params, qr -> {
 							if (qr.succeeded()) {
-								res.end(result.ok(qr.result().getRows()).toString());
+								res.end(OK(qr.result().getRows()));
 							} else {
-								res.end(result.err().toString());
+								res.end(Err());
 							}
 							connection.close();
 						});
 					} else {
-						res.end(result.err("the DB connect is null.").toString());
+						res.end(Err("the DB connect is null."));
 					}
 				} else {
-					res.end(result.err("get DB connect err.").toString());
+					res.end(Err("get DB connect err."));
 				}
 			});
 		} catch (Exception e) {
-			res.end(result.err(e.getMessage()).toString());
+			res.end(Err(e.getMessage()));
 			e.printStackTrace();
 		}
 	}
@@ -77,7 +73,6 @@ public class JdbcHelper {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<JsonObject> result = new CallResult<JsonObject>();
 		try {
 			client.getConnection(cr -> {
 				if (cr.succeeded()) {
@@ -85,21 +80,21 @@ public class JdbcHelper {
 					if (connection != null) {
 						connection.queryWithParams(sql, params, qr -> {
 							if (qr.succeeded()) {
-								res.end(result.ok(qr.result().getRows().get(0)).toString());
+								res.end(OK(qr.result().getRows().get(0)));
 							} else {
-								res.end(result.err().toString());
+								res.end(Err());
 							}
 							connection.close();
 						});
 					} else {
-						res.end(result.err("the DB connect is null.").toString());
+						res.end(Err("the DB connect is null."));
 					}
 				} else {
-					res.end(result.err("get DB connect err.").toString());
+					res.end(Err("get DB connect err."));
 				}
 			});
 		} catch (Exception e) {
-			res.end(result.err(e.getMessage()).toString());
+			res.end(Err(e.getMessage()));
 			e.printStackTrace();
 		}
 	}	
@@ -116,7 +111,6 @@ public class JdbcHelper {
 		HttpServerResponse res = ctx.response();
 		res.putHeader("content-type", "application/json");
 		SQLClient client = ConfigVerticle.client;
-		CallResult<List<JsonObject>> result = new CallResult<List<JsonObject>>();
 		try {
 			client.getConnection(cr -> {
 				if (cr.succeeded()) {
@@ -124,21 +118,21 @@ public class JdbcHelper {
 					if (connection != null) {
 						connection.updateWithParams(sql, params, qr -> {
 							if (qr.succeeded()) {
-								res.end(result.ok().toString());
+								res.end(OK());
 							} else {
-								res.end(result.err().toString());
+								res.end(Err());
 							}
 							connection.close();
 						});
 					} else {
-						res.end(result.err("the DB connect is null.").toString());
+						res.end(Err("the DB connect is null."));
 					}
 				} else {
-					res.end(result.err("get DB connect err.").toString());
+					res.end(Err("get DB connect err."));
 				}
 			});
 		} catch (Exception e) {
-			res.end(result.err(e.getMessage()).toString());
+			res.end(Err(e.getMessage()));
 			e.printStackTrace();
 		}
 	}
