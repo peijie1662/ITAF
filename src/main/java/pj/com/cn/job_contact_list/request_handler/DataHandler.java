@@ -1,7 +1,9 @@
 package pj.com.cn.job_contact_list.request_handler;
 
+import static pj.com.cn.job_contact_list.model.CallResult.Err;
+import static pj.com.cn.job_contact_list.model.CallResult.OK;
+
 import java.util.Date;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -14,7 +16,6 @@ import io.vertx.ext.sql.SQLConnection;
 import io.vertx.ext.web.RoutingContext;
 import pj.com.cn.job_contact_list.ConfigVerticle;
 import pj.com.cn.job_contact_list.JdbcHelper;
-import static pj.com.cn.job_contact_list.model.CallResult.*;
 
 /**
  * @author PJ

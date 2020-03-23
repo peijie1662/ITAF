@@ -299,7 +299,7 @@ public class CommonHandler {
 							notifyHandler.sendMsg(r.result(), message);
 							uploadHandler.fileTheDocument(rp.getString("checkinUser"), r.result(),
 									rp.getString("fileList"));
-							res.end(OK());
+							res.end(OK(r.result()));
 						} else {
 							res.end(Err(r.cause().getMessage()));
 						}

@@ -12,7 +12,7 @@
     "weight":1,
     "version": "1.0",
     "type": "http",
-    "desc": "ITå·¥ä½œè”ç³»å•(IT Application Form)"
+    "desc": "IT¹¤×÷ÁªÏµµ¥(IT Application Form)"
   },
   "db":{
     "provider_class": "io.vertx.ext.jdbc.spi.impl.HikariCPDataSourceProvider",
